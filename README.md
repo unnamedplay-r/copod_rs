@@ -14,5 +14,5 @@ engaging.
 2. I'm finding that the LLMs can produce absolute *hot* garbage when actively needing to code against
 a specified task with enough written requirements. I'd wager that creating an interated loop of
 requirements and specifications with the LLM *first* then specifiying enough of the task in relation
-to the requirements would get me much further on the first initial prompt. 
+to the requirements would get me much further on the first initial prompt.
 
