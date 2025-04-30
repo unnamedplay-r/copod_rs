@@ -1,23 +1,22 @@
 #![allow(dead_code)] // Allow unused functions for now
 #![allow(unused_variables)] // Allow unused variables for now
 
-use crate::types::{BTreeFloat, CopodError, FittedState, Result, ECDF};
+use crate::types::{BTreeFloat, CopodError, ECDF, FittedState, Result};
 use std::collections::BTreeMap;
 
 fn count_unique_floats_as_two_vecs(numbers: &[f64]) -> (Vec<f64>, Vec<usize>) {
     let mut counts: BTreeMap<BTreeFloat, usize> = BTreeMap::new();
-
     for num in numbers {
         let comparable_num = BTreeFloat(*num);
         *counts.entry(comparable_num).or_insert(0) += 1;
     }
 
     // The iterator yields (f64, usize) after the map. unzip() splits this.
-    counts.into_iter()
+    counts
+        .into_iter()
         .map(|(k, v)| (k.0, v)) // Transform (BTreeFloat, usize) to (f64, usize)
-        .unzip()               // Collects into (Vec<f64>, Vec<usize>)
+        .unzip() // Collects into (Vec<f64>, Vec<usize>)
 }
-
 
 /// Internal function to calculate the Empirical Cumulative Distribution Function (ECDF)
 /// for a single dimension (column) of the data.
@@ -52,14 +51,31 @@ pub(crate) fn fit_ecdf(column: &[f64]) -> Result<ECDF> {
     // Taking inspiration from both:
     // [1] https://www.statsmodels.org/stable/_modules/statsmodels/distributions/empirical_distribution.html#ECDF
     // [2] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L18
+    // [3] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L413  <- core function we use
     let (unique_values, counts) = count_unique_floats_as_two_vecs(column);
-    Ok(())
+
+    // TODO: create the cumsum of a Vec:
+    //       https://users.rust-lang.org/t/inplace-cumulative-sum-using-iterator/56532
+    // let mut cum_counts = counts.clone();
+    let mut cum_counts: Vec<u64> = counts.into_iter().map(|c| c as u64).collect();
+    cum_counts.iter_mut().fold(0, |acc, x| {
+        *x += acc;
+        *x
+    });
+
+    let n = column.len() as f64;
+    let cdf = cum_counts.iter().map(|x| *x as f64 / n).collect::<Vec<_>>();
+
+    Ok(ECDF {
+        counts: cum_counts,
+        quantiles: cdf,
+    })
 }
 
 /// Internal function to calculate the skewness of a single dimension (column).
 /// Corresponds to Equation 11 in the paper.
 ///
-/// Args:
+// Args:
 ///     column: A slice representing a single feature/dimension.
 ///
 /// Returns:
@@ -159,7 +175,7 @@ pub(crate) fn calculate_dimensional_scores(
     //    Let's use the negative log for consistency with the final score: O_d = max(-ln(U_d), -ln(V_d))  implies using the raw max, but algorithm 1  implies neg log. Let's stick to neg log for consistency.
     //    Re-reading Sec II-E, it seems to suggest O_d(xi)=max{log(Ud,i), log(Vd,i), log(Wd,i)}, which differs from the final score calculation using negative logs.
     //    However, the *intent* is to show contribution to the final score. Let's calculate -log(U_d), -log(V_d), -log(W_d) for interpretability.
-    //    Final Score O(xi) = max{pl, pr, ps} where pl = -sum(log(Uj)), pr = -sum(log(Vj)), ps = -sum(log(Wj)) 
+    //    Final Score O(xi) = max{pl, pr, ps} where pl = -sum(log(Uj)), pr = -sum(log(Vj)), ps = -sum(log(Wj))
     //    Let's provide the individual terms: [-log(U_d), -log(V_d), -log(W_d)] for each dimension d. This provides maximum explanation power.
 
     let mut dimensional_scores: Vec<Vec<f64>> = Vec::with_capacity(fitted_state.dimensions);
@@ -167,8 +183,8 @@ pub(crate) fn calculate_dimensional_scores(
     // Placeholder: Need actual ECDFs in fitted_state
     for d in 0..fitted_state.dimensions {
         // Placeholder values - replace with actual calculations using ECDFs
-        let u_d = 0.5; // Replace with F_d(point[d])
-        let v_d = 0.5; // Replace with Fbar_d(point[d]) calculated from ECDF of -X
+        let u_d: f64 = 0.5; // Replace with F_d(point[d])
+        let v_d: f64 = 0.5; // Replace with Fbar_d(point[d]) calculated from ECDF of -X
         // let w_d = if fitted_state.skewness[d] < 0.0 { u_d } else { v_d }; // Calculate W_d
 
         let neg_log_u = if u_d <= 0.0 { f64::INFINITY } else { -u_d.ln() };

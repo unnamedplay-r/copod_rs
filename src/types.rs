@@ -136,8 +136,8 @@ impl Ord for BTreeFloat {
 
 /// Empirical Cumulative Distribution Function, with inspiration from SciPy
 pub(crate) struct ECDF {
-    counts: Vec<i64>,
-    quantiles: Vec<f64>,
+    pub counts: Vec<u64>,
+    pub quantiles: Vec<f64>,
 }
 
 impl ECDF {

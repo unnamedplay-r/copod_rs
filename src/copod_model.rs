@@ -3,7 +3,7 @@
 
 use crate::internals;
 use crate::types::DataProperties;
-use crate::types::{CopodError, CopodVariant, DataMatrix, FittedState, Result, ECDF};
+use crate::types::{CopodError, CopodVariant, DataMatrix, ECDF, FittedState, Result};
 
 /// The main COPOD model struct.
 #[derive(Debug, Clone)]
@@ -63,25 +63,22 @@ impl Copod {
         // TODO: implement logic in 3
         for col in 0..n_dim {
             let col_d: Vec<f64> = data.get_column_copy(col);
-            
-            // TODO: Find a good solution on how to embed fitting the ecdf. I think a method would
-            //       be appropriate
-            let ecdf: ECDF = internals::fit_ecdf(column);
 
             // compute ecdf
+            let ecdf: ECDF = internals::fit_ecdf(&col_d)?; // TODO: change this to a method
+            todo!();
         }
 
         // Placeholder fitted state
         self.fitted_state = Some(FittedState {
             dimensions: n_dim,
             n_samples: n_samples, /*, TODO: add ECDFs, skewness */
-            contamination: 0.5
+            contamination: 0.5,
         });
 
         println!(
             "Model fitted (stub implementation). Dimensions: {}, Samples: {}",
             n_dim, n_samples
-
         );
         Ok(())
     }
@@ -97,7 +94,7 @@ impl Copod {
     ///     Higher scores indicate a higher likelihood of being an outlier.
     pub fn predict(&self, data: &DataMatrix) -> Result<Vec<f64>> {
         // TODO: Implement the prediction logic.
-        // 1. Check if the model is fitted (`self.fitted_state.is_some()`). 
+        // 1. Check if the model is fitted (`self.fitted_state.is_some()`).
         //      If not, return Err(CopodError::NotFitted).
         // 2. Get the fitted state.
         // 3. For each data point `x_i` in `data`:
