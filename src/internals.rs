@@ -5,6 +5,9 @@ use crate::types::{BTreeFloat, CopodError, ECDF, FittedState, Result};
 use std::collections::BTreeMap;
 
 fn count_unique_floats_as_two_vecs(numbers: &[f64]) -> (Vec<f64>, Vec<usize>) {
+    // TODO: Change the name of the function - it's a bit too verbose, and be
+    //       named something akin to "n_unique_counts", or "value_counts"
+    // TODO: fix the usize output and put to an int
     let mut counts: BTreeMap<BTreeFloat, usize> = BTreeMap::new();
     for num in numbers {
         let comparable_num = BTreeFloat(*num);
@@ -51,11 +54,11 @@ pub(crate) fn fit_ecdf(column: &[f64]) -> Result<ECDF> {
     // Taking inspiration from both:
     // [1] https://www.statsmodels.org/stable/_modules/statsmodels/distributions/empirical_distribution.html#ECDF
     // [2] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L18
-    // [3] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L413  <- core function we use
+    // [3] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L413  <- core function we emulate
     let (unique_values, counts) = count_unique_floats_as_two_vecs(column);
 
-    // TODO: create the cumsum of a Vec:
-    //       https://users.rust-lang.org/t/inplace-cumulative-sum-using-iterator/56532
+    // create the cumsum of a Vec:
+    // https://users.rust-lang.org/t/inplace-cumulative-sum-using-iterator/56532
     // let mut cum_counts = counts.clone();
     let mut cum_counts: Vec<u64> = counts.into_iter().map(|c| c as u64).collect();
     cum_counts.iter_mut().fold(0, |acc, x| {
