@@ -1,6 +1,7 @@
 #![allow(dead_code)] // Allow unused variants for now
 
 // use std::collections::BTreeMap;
+use crate::internals;
 use std::cmp::Ordering;
 
 /// Defines the different ways to calculate tail probabilities in COPOD.
@@ -141,11 +142,57 @@ pub(crate) struct ECDF {
 }
 
 impl ECDF {
-    fn fit(data: Vec<f64>) -> ECDF {
-        todo!();
+    /// Calculate the ECDF for an entire column.
+    /// This might return a representation useful for quick lookups.
+    ///
+    /// Args:
+    ///     column: A slice representing a single feature/dimension.
+    ///
+    /// Returns:
+    ///     A representation of the ECDF (e.g., sorted values and ranks).
+    pub(crate) fn fit(column: &[f64]) -> Result<ECDF> {
+        // Taking inspiration from both:
+        // [1] https://www.statsmodels.org/stable/_modules/statsmodels/distributions/empirical_distribution.html#ECDF
+        // [2] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L18
+        // [3] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L413  <- core function we emulate
+        let (unique_values, counts) = internals::count_unique_floats_as_two_vecs(column);
 
-        // let mut uniq_n_counts = BTreeMap::new();
-        // counts = data
-        // ECDF {}
+        // create the cumsum of a Vec:
+        // https://users.rust-lang.org/t/inplace-cumulative-sum-using-iterator/56532
+        // let mut cum_counts = counts.clone();
+        let mut cum_counts: Vec<u64> = counts.into_iter().map(|c| c as u64).collect();
+        cum_counts.iter_mut().fold(0, |acc, x| {
+            *x += acc;
+            *x
+        });
+
+        let n = column.len() as f64;
+        let cdf = cum_counts.iter().map(|&x| x as f64 / n).collect::<Vec<_>>();
+
+        Ok(ECDF {
+            counts: cum_counts,
+            quantiles: cdf,
+        })
+    }
+
+    /// Internal function to calculate the Empirical Cumulative Distribution Function (ECDF)
+    /// for a single dimension (column) of the data.
+    /// This corresponds to Equation 5 in the paper.
+    ///
+    /// Args:
+    ///     column: A slice representing a single feature/dimension.
+    ///     value: The value at which to evaluate the ECDF.
+    ///
+    /// Returns:
+    ///     The ECDF value P(X <= value).
+    pub(crate) fn calculate_ecdf_value(column: &[f64], value: f64) -> f64 {
+        // TODO: Implement ECDF calculation: count(x_i <= value) / n
+        let n = column.len() as f64;
+        if n == 0.0 {
+            return 0.0;
+        }
+
+        let count = column.iter().filter(|&x| *x <= value).count() as f64;
+        count / n
     }
 }

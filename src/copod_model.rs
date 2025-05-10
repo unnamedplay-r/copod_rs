@@ -5,6 +5,14 @@ use crate::internals;
 use crate::types::DataProperties;
 use crate::types::{CopodError, CopodVariant, DataMatrix, ECDF, FittedState, Result};
 
+/// Column state vector
+struct ColumnState {
+    col_n: i64,
+    left_tail_ecdf: ECDF,
+    right_tail_ecdf: ECDF,
+    skewness: Option<f64>,
+}
+
 /// The main COPOD model struct.
 #[derive(Debug, Clone)]
 pub struct Copod {
@@ -60,19 +68,45 @@ impl Copod {
             ));
         }
 
-        // TODO: implement logic in 3
+        // Follows closely the logic from Algorithm 1.
+        let mut col_state: Vec<ColumnState> = Vec::new();
         for col in 0..n_dim {
             let col_d: Vec<f64> = data.get_column_copy(col);
 
             // compute ecdf
-            let ecdf: ECDF = internals::fit_ecdf(&col_d)?; // TODO: change this to a method
-            todo!();
+            let left_tail_ecdf: ECDF = ECDF::fit(&col_d)?; // TODO: change this to a method
+
+            /*
+            we can do something more saucy here and just negate the unique count values instead of recomputing
+            them over again. From there, we can just work with the cumulative sum of those negated features.
+            it's also worth questioning if there's a direct relationship between the positive and negative
+            cumulative sums of a set of values - it seems at first glance that there's a trivial relationship between
+            them, on the same given set of data. */
+            let neg_col_d = col_d.iter().map(|x| -x).collect::<Vec<f64>>();
+            let right_tail_ecdf: ECDF = ECDF::fit(&neg_col_d)?;
+
+            // TODO: add in a if condition to check if the variant is skewness corrected
+            let skew_coef: Option<f64> = match self.variant {
+                CopodVariant::SkewnessCorrected => Some(internals::calculate_skewness(&col_d)),
+                _ => None,
+            };
+
+            col_state.push(ColumnState {
+                col_n: col as i64,
+                left_tail_ecdf,
+                right_tail_ecdf,
+                skewness: skew_coef,
+            });
+        }
+
+        for col in 0..n_dim {
+            let copula_state: &ColumnState = &col_state[col];
         }
 
         // Placeholder fitted state
         self.fitted_state = Some(FittedState {
             dimensions: n_dim,
-            n_samples: n_samples, /*, TODO: add ECDFs, skewness */
+            n_samples, /*, TODO: add ECDFs, skewness */
             contamination: 0.5,
         });
 

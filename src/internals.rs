@@ -4,7 +4,7 @@
 use crate::types::{BTreeFloat, CopodError, ECDF, FittedState, Result};
 use std::collections::BTreeMap;
 
-fn count_unique_floats_as_two_vecs(numbers: &[f64]) -> (Vec<f64>, Vec<usize>) {
+pub(crate) fn count_unique_floats_as_two_vecs(numbers: &[f64]) -> (Vec<f64>, Vec<usize>) {
     // TODO: Change the name of the function - it's a bit too verbose, and be
     //       named something akin to "n_unique_counts", or "value_counts"
     // TODO: fix the usize output and put to an int
@@ -21,60 +21,6 @@ fn count_unique_floats_as_two_vecs(numbers: &[f64]) -> (Vec<f64>, Vec<usize>) {
         .unzip() // Collects into (Vec<f64>, Vec<usize>)
 }
 
-/// Internal function to calculate the Empirical Cumulative Distribution Function (ECDF)
-/// for a single dimension (column) of the data.
-/// This corresponds to Equation 5 in the paper.
-///
-/// Args:
-///     column: A slice representing a single feature/dimension.
-///     value: The value at which to evaluate the ECDF.
-///
-/// Returns:
-///     The ECDF value P(X <= value).
-pub(crate) fn calculate_ecdf_value(column: &[f64], value: f64) -> f64 {
-    // TODO: Implement ECDF calculation: count(x_i <= value) / n
-    let n = column.len() as f64;
-    if n == 0.0 {
-        return 0.0;
-    }
-    let count = column.iter().filter(|&&x| x <= value).count() as f64;
-    count / n
-}
-
-/// Internal function to calculate the ECDF for an entire column.
-/// This might return a representation useful for quick lookups.
-///
-/// Args:
-///     column: A slice representing a single feature/dimension.
-///
-/// Returns:
-///     A representation of the ECDF (e.g., sorted values and ranks).
-pub(crate) fn fit_ecdf(column: &[f64]) -> Result<ECDF> {
-    // TODO: Implement logic to efficiently represent the ECDF for a column.
-    // Taking inspiration from both:
-    // [1] https://www.statsmodels.org/stable/_modules/statsmodels/distributions/empirical_distribution.html#ECDF
-    // [2] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L18
-    // [3] https://github.com/scipy/scipy/blob/main/scipy/stats/_survival.py#L413  <- core function we emulate
-    let (unique_values, counts) = count_unique_floats_as_two_vecs(column);
-
-    // create the cumsum of a Vec:
-    // https://users.rust-lang.org/t/inplace-cumulative-sum-using-iterator/56532
-    // let mut cum_counts = counts.clone();
-    let mut cum_counts: Vec<u64> = counts.into_iter().map(|c| c as u64).collect();
-    cum_counts.iter_mut().fold(0, |acc, x| {
-        *x += acc;
-        *x
-    });
-
-    let n = column.len() as f64;
-    let cdf = cum_counts.iter().map(|x| *x as f64 / n).collect::<Vec<_>>();
-
-    Ok(ECDF {
-        counts: cum_counts,
-        quantiles: cdf,
-    })
-}
-
 /// Internal function to calculate the skewness of a single dimension (column).
 /// Corresponds to Equation 11 in the paper.
 ///
@@ -84,24 +30,25 @@ pub(crate) fn fit_ecdf(column: &[f64]) -> Result<ECDF> {
 /// Returns:
 ///     The calculated skewness value. Returns 0.0 if calculation isn't possible (e.g., n < 3 or std dev is 0).
 pub(crate) fn calculate_skewness(column: &[f64]) -> f64 {
-    // TODO: Implement skewness calculation.
     let n = column.len();
     if n < 3 {
         return 0.0;
     } // Skewness requires at least 3 points
 
+    // calculate \bar{x_i}
     let mean = column.iter().sum::<f64>() / (n as f64);
-    let variance = column.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / ((n - 1) as f64); // Use sample variance n-1
+    let residuals: Vec<f64> = column.iter().map(|&x| (x - mean)).collect(); // Use sample variance n-1
 
-    if variance == 0.0 {
+    // te = top expression, be = bottom expression
+    let te: f64 = residuals.iter().map(|&r| r.powi(3)).sum::<f64>() / n as f64;
+    let be: f64 = residuals.iter().map(|&r| r.powi(2)).sum::<f64>() / (n - 1) as f64;
+
+    // Avoid division by zero or using zero if all points are the same
+    if be == 0.0 || te == 0.0 {
         return 0.0;
-    } // Avoid division by zero if all points are the same
-    let std_dev = variance.sqrt();
+    }
 
-    let m3 = column.iter().map(|&x| (x - mean).powi(3)).sum::<f64>() / (n as f64); // Third central moment (biased estimator is fine here per paper)
-    let skewness = m3 / std_dev.powi(3);
-
-    skewness
+    te / be.powf(1. / 3.)
 }
 
 /// Internal function to calculate the empirical copula observations for a single data point.
