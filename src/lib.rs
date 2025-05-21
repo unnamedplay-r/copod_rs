@@ -39,7 +39,7 @@ mod tests {
 
         // 2. Initialize model
         // Using SkewnessCorrected as it's generally the best performing variant
-        let mut model = Copod::new(CopodVariant::SkewnessCorrected);
+        let mut model = Copod::new(CopodVariant::SkewnessCorrected, false);
 
         // 3. Fit model
         let fit_result = model.fit(&train_data);
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_not_fitted() {
-        let model = Copod::new(CopodVariant::LeftTail);
+        let model = Copod::new(CopodVariant::LeftTail, false);
         let test_data: DataMatrix = vec![vec![1.0, 2.0]];
         let predict_result = model.predict(&test_data);
         assert!(matches!(predict_result, Err(CopodError::NotFitted)));
@@ -80,7 +80,7 @@ mod tests {
     fn test_dimension_mismatch() {
         let train_data: DataMatrix = vec![vec![1.0, 2.0], vec![1.1, 2.1]];
         let test_data_wrong_dim: DataMatrix = vec![vec![1.0, 2.0, 3.0]];
-        let mut model = Copod::new(CopodVariant::TwoTails);
+        let mut model = Copod::new(CopodVariant::TwoTails, false);
         model.fit(&train_data).unwrap();
 
         let predict_result = model.predict(&test_data_wrong_dim);
@@ -98,7 +98,7 @@ mod tests {
             vec![4.0, 5.0],
             vec![6.0, 7.0, 8.0, 9.0],
         ];
-        let mut model = Copod::new(CopodVariant::SkewnessCorrected);
+        let mut model = Copod::new(CopodVariant::SkewnessCorrected, false);
         let is_fit = model.fit(&invalid_matrix);
         assert!(matches!(is_fit, Err(CopodError::InvalidInput(_))));
     }
@@ -107,7 +107,7 @@ mod tests {
     fn test_fit_invalid_data_empty_outer_matrix() {
         // An empty outer vector
         let empty_matrix: DataMatrix = vec![];
-        let mut model = Copod::new(CopodVariant::SkewnessCorrected);
+        let mut model = Copod::new(CopodVariant::SkewnessCorrected, false);
         let is_fit = model.fit(&empty_matrix);
         assert!(matches!(is_fit, Err(CopodError::InvalidInput(_))));
     }

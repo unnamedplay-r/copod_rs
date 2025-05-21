@@ -18,6 +18,7 @@ struct ColumnState {
 pub struct Copod {
     variant: CopodVariant,
     fitted_state: Option<FittedState>,
+    ecdf_approx: bool,
 }
 
 impl Copod {
@@ -25,10 +26,11 @@ impl Copod {
     ///
     /// Args:
     ///     variant: The type of COPOD calculation to use (LeftTail, RightTail, TwoTails, SkewnessCorrected).
-    pub fn new(variant: CopodVariant) -> Self {
+    pub fn new(variant: CopodVariant, ecdf_approx: bool) -> Self {
         Copod {
             variant,
             fitted_state: None,
+            ecdf_approx, // TODO
         }
     }
 
@@ -85,7 +87,6 @@ impl Copod {
             let neg_col_d = col_d.iter().map(|x| -x).collect::<Vec<f64>>();
             let right_tail_ecdf: ECDF = ECDF::fit(&neg_col_d)?;
 
-            // TODO: add in a if condition to check if the variant is skewness corrected
             let skew_coef: Option<f64> = match self.variant {
                 CopodVariant::SkewnessCorrected => Some(internals::calculate_skewness(&col_d)),
                 _ => None,
@@ -101,6 +102,10 @@ impl Copod {
 
         for col in 0..n_dim {
             let copula_state: &ColumnState = &col_state[col];
+
+            copula_state
+                .left_tail_ecdf
+                .calculate_ecdf_value(column, value)
         }
 
         // Placeholder fitted state

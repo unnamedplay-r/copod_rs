@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Allow unused variants for now
-
 // use std::collections::BTreeMap;
 use crate::internals;
 use std::cmp::Ordering;
@@ -137,6 +135,7 @@ impl Ord for BTreeFloat {
 
 /// Empirical Cumulative Distribution Function, with inspiration from SciPy
 pub(crate) struct ECDF {
+    pub values: Vec<f64>,
     pub counts: Vec<u64>,
     pub quantiles: Vec<f64>,
 }
@@ -170,6 +169,7 @@ impl ECDF {
         let cdf = cum_counts.iter().map(|&x| x as f64 / n).collect::<Vec<_>>();
 
         Ok(ECDF {
+            unique_values,
             counts: cum_counts,
             quantiles: cdf,
         })
@@ -185,14 +185,19 @@ impl ECDF {
     ///
     /// Returns:
     ///     The ECDF value P(X <= value).
-    pub(crate) fn calculate_ecdf_value(column: &[f64], value: f64) -> f64 {
+    pub(crate) fn calculate_ecdf_value(&self, column: &[f64], value: f64) -> f64 {
         // TODO: Implement ECDF calculation: count(x_i <= value) / n
         let n = column.len() as f64;
         if n == 0.0 {
             return 0.0;
         }
 
+        // this is the ideal way of performing the ecdf if the value is a float (which we can default use for now)
         let count = column.iter().filter(|&x| *x <= value).count() as f64;
         count / n
+    }
+
+    fn get_approx_cdf(column: &[f64]) -> Result<ECDF> {
+        todo!()
     }
 }
